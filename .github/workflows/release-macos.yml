@@ -1,0 +1,135 @@
+name: release-macos
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "版本号（不含 v 前缀）。留空则取 constants.py 的 VERSION"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: 构建 + 签名 + 门禁
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: 解析版本
+        run: |
+          set -euo pipefail
+          RAW="${{ github.ref_name }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.version }}" ]; then
+            RAW="${{ inputs.version }}"
+          fi
+          VER="${RAW#v}"
+          if [ -z "$VER" ]; then
+            VER=$(python - <<'PY'
+            import re
+            for line in open("constants.py", encoding="utf-8"):
+                if line.startswith("VERSION"):
+                    print(line.split("=", 1)[1].strip().strip('"\''))
+                    break
+            PY
+            )
+          fi
+          echo "VERSION=$VER" >> "$GITHUB_ENV"
+          echo "ZIP_NAME=ScrcpyTestPanel-v$VER-macos-aarch64.app.zip" >> "$GITHUB_ENV"
+          echo "解析版本：$VER"
+
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 语法门禁
+        run: python -m compileall -q constants.py config_helper.py scrcpy_manager.py test_manager.py main_qt.py scripts
+
+      - name: 生成构建信息
+        run: python scripts/gen_build_info.py --version "$VERSION" --out _build_info.py
+
+      - name: 源码自检
+        run: python main_qt.py --selftest
+
+      - name: PyInstaller 打包
+        run: pyinstaller build_mac.spec --noconfirm
+
+      - name: ad-hoc 签名
+        run: codesign --force --deep --sign - dist/ScrcpyTestPanel.app
+
+      - name: 门禁 1｜签名校验
+        run: codesign --verify --deep --strict --verbose=2 dist/ScrcpyTestPanel.app
+
+      - name: 门禁 2｜Info.plist 合法
+        run: plutil -lint dist/ScrcpyTestPanel.app/Contents/Info.plist
+
+      - name: 门禁 3｜可执行文件存在
+        run: test -x dist/ScrcpyTestPanel.app/Contents/MacOS/ScrcpyTestPanel
+
+      - name: 门禁 4｜版本与 tag 一致
+        run: |
+          set -euo pipefail
+          PLIST_VER=$(plutil -extract CFBundleShortVersionString raw -o - dist/ScrcpyTestPanel.app/Contents/Info.plist)
+          echo "plist=$PLIST_VER  expect=$VERSION"
+          test "$PLIST_VER" = "$VERSION"
+
+      - name: 门禁 5｜打包产物自检
+        run: dist/ScrcpyTestPanel.app/Contents/MacOS/ScrcpyTestPanel --selftest
+
+      - name: 压缩（ditto）
+        run: |
+          set -euo pipefail
+          ditto -c -k --keepParent dist/ScrcpyTestPanel.app "$ZIP_NAME"
+          shasum -a 256 "$ZIP_NAME" > SHA256SUMS.txt
+          printf '%s' "$VERSION" > VERSION.txt
+          ls -lh "$ZIP_NAME"
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-package
+          path: |
+            ${{ env.ZIP_NAME }}
+            SHA256SUMS.txt
+            VERSION.txt
+          if-no-files-found: error
+
+  release:
+    name: 创建正式 Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 下载构建产物
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-package
+          path: release
+
+      - name: 生成正式 Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VER=$(cat release/VERSION.txt)
+          TAG="v$VER"
+          sed "s/__VERSION__/$VER/g" .github/release-notes-template.md > notes.md
+          gh release create "$TAG" \
+            "release/ScrcpyTestPanel-v$VER-macos-aarch64.app.zip" \
+            "release/SHA256SUMS.txt" \
+            --title "ScrcpyTestPanel v$VER" \
+            --notes-file notes.md
+          echo "已发布正式版本 $TAG（非 prerelease）"

@@ -1,0 +1,11 @@
+venv/
+dist/
+build/
+_build_info.py
+__pycache__/
+*.py[cod]
+.DS_Store
+.idea/
+.vscode/
+crash-*.log
+config.broken.*.json
