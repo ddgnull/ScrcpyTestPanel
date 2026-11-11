@@ -12,10 +12,16 @@ jobs:
   ubuntu:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "ubuntu runner ok"
-      - run: python3 --version
-  macos:
+      - run: echo "ubuntu ok"
+  macos13:
+    runs-on: macos-13
+    steps:
+      - run: echo "macos13 ok"
+  macos14:
     runs-on: macos-14
     steps:
-      - run: echo "macos runner ok"
-      - run: sw_vers
+      - run: echo "macos14 ok"
+  macos15:
+    runs-on: macos-15
+    steps:
+      - run: echo "macos15 ok"
