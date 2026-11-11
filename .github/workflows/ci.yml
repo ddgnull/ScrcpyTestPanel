@@ -12,7 +12,7 @@ permissions:
 jobs:
   check:
     name: 语法门禁 + 无头自检
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
         with:
@@ -22,6 +22,11 @@ jobs:
         with:
           python-version: "3.12"
           cache: "pip"
+
+      - name: 运行环境信息
+        run: |
+          uname -m
+          sw_vers
 
       - name: 安装依赖
         run: |

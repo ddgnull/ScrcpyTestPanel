@@ -16,7 +16,7 @@ permissions:
 jobs:
   build:
     name: 构建 + 签名 + 门禁
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
         with:
