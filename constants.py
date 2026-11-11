@@ -14,7 +14,7 @@ APP_DISPLAY_NAME = "ScrcpyTestPanel"
 APP_ID = "com.ddgnull.scrcpytestpanel"
 REPO_URL = "https://github.com/ddgnull/ScrcpyTestPanel"
 
-VERSION = "0.0.1"
+VERSION = "0.0.2"
 BUILD_TIME = "unknown"
 GIT_COMMIT_SHORT = "unknown"
 

@@ -3,7 +3,7 @@
 macOS 上的 Android 自动化测试调度控制台（PySide6）：多版本 scrcpy 投屏调度 + 独立 Python 环境跑自动化脚本 + 报告归档与一键打开。
 
 - 工具版本独立演进，与 scrcpy 版本**无任何绑定关系**（scrcpy 只是被调度的外部二进制）
-- 当前版本：`0.0.1`（0.x 亦为正式发布，非预发布）
+- 当前版本：`0.0.2`（0.x 亦为正式发布，非预发布）
 - 仓库：https://github.com/ddgnull/ScrcpyTestPanel
 
 ---
@@ -60,11 +60,11 @@ python main_qt.py --selftest
 ## 打包（本地手动，备选通道）
 
 ```bash
-python scripts/gen_build_info.py --version 0.0.1
+python scripts/gen_build_info.py --version 0.0.2
 pyinstaller build_mac.spec --noconfirm
 codesign --force --deep --sign - dist/ScrcpyTestPanel.app
-ditto -c -k --keepParent dist/ScrcpyTestPanel.app ScrcpyTestPanel-v0.0.1-macos-aarch64.app.zip
-shasum -a 256 ScrcpyTestPanel-v0.0.1-macos-aarch64.app.zip > SHA256SUMS.txt
+ditto -c -k --keepParent dist/ScrcpyTestPanel.app ScrcpyTestPanel-v0.0.2-macos-aarch64.app.zip
+shasum -a 256 ScrcpyTestPanel-v0.0.2-macos-aarch64.app.zip > SHA256SUMS.txt
 ```
 
 验证：
@@ -85,8 +85,8 @@ dist/ScrcpyTestPanel.app/Contents/MacOS/ScrcpyTestPanel --selftest
 推 tag 即触发 `.github/workflows/release-macos.yml`：
 
 ```bash
-git tag v0.0.1
-git push origin v0.0.1
+git tag v0.0.2
+git push origin v0.0.2
 ```
 
 流程：源码自检 → 打包 → ad-hoc 签名 → 九项门禁 → zip + SHA256 → 创建**正式 Release**（不进 prerelease）。
@@ -95,7 +95,7 @@ git push origin v0.0.1
 
 ### 手动（备选）
 
-本地按上一节打包，然后在 GitHub 页面 New Release 填写 tag `v0.0.1`，上传 zip 与 `SHA256SUMS.txt`，**直接 Publish，不要勾 "Set as a pre-release"**。
+本地按上一节打包，然后在 GitHub 页面 New Release 填写 tag `v0.0.2`，上传 zip 与 `SHA256SUMS.txt`，**直接 Publish，不要勾 "Set as a pre-release"**。
 
 ---
 
