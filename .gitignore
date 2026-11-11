@@ -13,3 +13,4 @@ config.broken.*.json
 # 打包产物（本地生成，不入库）
 *.app.zip
 SHA256SUMS.txt
+VERSION.txt

@@ -36,14 +36,7 @@ jobs:
           fi
           VER="${RAW#v}"
           if [ -z "$VER" ]; then
-            VER=$(python - <<'PY'
-            import re
-            for line in open("constants.py", encoding="utf-8"):
-                if line.startswith("VERSION"):
-                    print(line.split("=", 1)[1].strip().strip('"\''))
-                    break
-            PY
-            )
+            VER=$(grep -E '^VERSION[[:space:]]*=' constants.py | head -1 | cut -d'=' -f2 | tr -d ' "')
           fi
           echo "VERSION=$VER" >> "$GITHUB_ENV"
           echo "ZIP_NAME=ScrcpyTestPanel-v$VER-macos-aarch64.app.zip" >> "$GITHUB_ENV"
@@ -101,7 +94,7 @@ jobs:
         with:
           name: macos-package
           path: |
-            ${{ env.ZIP_NAME }}
+            *.app.zip
             SHA256SUMS.txt
             VERSION.txt
           if-no-files-found: error
