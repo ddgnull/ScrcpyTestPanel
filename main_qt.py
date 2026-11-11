@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import os
+import signal
 import sys
 import tempfile
 import threading
@@ -1717,17 +1718,39 @@ def run_selftest() -> int:
 
 
 def _acquire_instance() -> Tuple[bool, Optional[QLockFile]]:
-    lock = QLockFile(os.path.join(C.config_dir(), "panel.lock"))
-    lock.setStaleLockTime(0)
+    lock_path = os.path.join(C.config_dir(), "panel.lock")
+    lock = QLockFile(lock_path)
+    lock.setStaleLockTime(30)
     if lock.tryLock(200):
         return True, lock
+
+    # 已有锁：先尝试唤醒正在运行的实例
     socket = QLocalSocket()
     socket.connectToServer(SERVER_NAME)
-    if socket.waitForConnected(1000):
+    if socket.waitForConnected(3000):
         socket.write(b"show")
         socket.flush()
         socket.waitForBytesWritten(1000)
         socket.disconnectFromServer()
+        return False, lock
+
+    # 无人应答 → 僵尸锁（实例崩溃 / 无窗口进程残留），清理后重试一次
+    print("[SYS] 检测到无人应答的单实例锁，尝试回收", file=sys.stderr)
+    try:
+        lock.removeStaleLockFile()
+    except Exception:
+        pass
+    try:
+        if os.path.exists(lock_path):
+            os.remove(lock_path)
+    except OSError:
+        pass
+
+    lock = QLockFile(lock_path)
+    lock.setStaleLockTime(30)
+    if lock.tryLock(200):
+        print("[SYS] 已回收失效锁并接管实例", file=sys.stderr)
+        return True, lock
     return False, lock
 
 
@@ -1741,11 +1764,26 @@ def main(argv: Optional[List[str]] = None) -> int:
     app.setApplicationDisplayName(C.APP_DISPLAY_NAME)
     app.setApplicationVersion(C.VERSION)
 
+    # SIGTERM / SIGINT 走 Qt 事件循环优雅退出，避免被 kill 后留下僵尸锁
+    def _on_signal(signum, frame):  # noqa: ARG001
+        QTimer.singleShot(0, app.quit)
+
+    for _sig in (signal.SIGTERM, signal.SIGINT):
+        try:
+            signal.signal(_sig, _on_signal)
+        except (ValueError, OSError):
+            pass
+
     os.makedirs(C.config_dir(), exist_ok=True)
 
     acquired, lock = _acquire_instance()
     if not acquired:
-        QMessageBox.information(None, C.APP_DISPLAY_NAME, "已有一个实例正在运行，请从菜单栏图标打开。")
+        QMessageBox.warning(
+            None,
+            C.APP_DISPLAY_NAME,
+            "已有一个实例正在运行，请从菜单栏图标打开。\n\n"
+            f"若确认没有窗口可见，可删除锁文件后重试：\n{C.config_dir()}/panel.lock",
+        )
         return 0
 
     cfg = CH.ConfigHelper()
